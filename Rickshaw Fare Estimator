@@ -1,0 +1,147 @@
+#Rickshaw Fare Estimator: This is program designed to calculate an estimate of the rickshaw share for a user, 
+#given their travel time and distance. 
+
+import pandas as pd
+import tkinter as tk
+from tkinter import messagebox
+from tkinter.font import Font
+
+#Data Prep
+traffic_df = pd.read_csv('traffic_data.csv')
+traffic_df['avg_speed'] = traffic_df[['Sun','Mon','Tue','Wed','Thu','Fri','Sat']].mean(axis=1)
+traffic_df_avg = traffic_df[['Time','avg_speed']]
+
+#Time slots for waiting time calculation
+night_charge = traffic_df_avg.iloc[0:6]
+morning = traffic_df_avg.iloc[6:9]
+morning_rush = traffic_df_avg.iloc[9:13]
+afternoon = traffic_df_avg.iloc[13:17]
+evening_rush = traffic_df_avg[17:21]
+night = traffic_df_avg[21:]
+
+#Avg speeds as per time slots
+night_charge_avg = night_charge['avg_speed'].mean()
+morning_avg = morning['avg_speed'].mean()
+morning_rush_avg = morning_rush['avg_speed'].mean()
+afternoon_avg = afternoon['avg_speed'].mean()
+evening_rush_avg = evening_rush['avg_speed'].mean()
+night_avg = night['avg_speed'].mean()
+avg_speeds = {1: night_charge_avg, 2: morning_avg, 3: morning_rush_avg, 4: afternoon_avg, 5:evening_rush_avg, 6: night_avg}
+
+#Calculating journey time
+def journey_time(slot, distance):
+    for i in range(7):
+        if slot == i:
+            avg_speed = avg_speeds[i]
+            return distance/avg_speed
+    
+    
+
+#Calculating base fare using formula
+def base_fare(distance):
+    if(distance < 1.5):
+        fare = 23
+    else:
+        fare = distance * 15.33
+    return fare
+
+
+#Estimating waiting charges
+def waiting_charge(distance, journey_time):
+    cruising_speed = 60 #average cruising speed on mumbai roads for auto-rickshaws
+    cruising_journey_time = distance/ cruising_speed
+    if (cruising_journey_time < journey_time):
+        waiting_time = (journey_time - cruising_journey_time) * 60 #adjusted according to primary data collection
+        waiting_charges = waiting_time * 1.7
+        return waiting_charges
+    else:
+        return 0
+    
+
+#estimating total fare
+def total_fare_calculator(slot, distance):
+    journey_time1 = journey_time(slot, distance)
+    total_fare = base_fare(distance) + waiting_charge(distance, journey_time1)
+    if slot == 1:
+        total_fare += (total_fare * 0.25)
+    return total_fare
+
+
+print(total_fare_calculator(2, 4.9))
+
+
+# Function to get time slot description
+def get_time_slot_description(slot):
+    time_slots = {
+        1: "Night Charge (12 AM - 6 AM)",
+        2: "Morning (6 AM - 9 AM)",
+        3: "Morning Rush (9 AM - 1 PM)",
+        4: "Afternoon (1 PM - 5 PM)",
+        5: "Evening Rush (5 PM - 9 PM)",
+        6: "Night (9 PM - 12 AM)"
+    }
+    return time_slots.get(slot, "Unknown")
+
+# Function to calculate the total fare
+def calculate_fare():
+    try:
+        slot = var_slot.get()
+        distance = float(distance_entry.get())
+        fare = total_fare_calculator(slot, distance)
+        messagebox.showinfo("Fare Estimate", f"The estimated fare is ₹{fare:.2f}")
+    except ValueError:
+        messagebox.showerror("Error", "Please enter valid values for slot and distance.")
+
+# Create the main window
+window = tk.Tk()
+window.title("Rickshaw Fare Estimator")
+window.geometry("400x250")  # Adjusted window size to accommodate additional information
+
+# Configure font
+font = Font(family="Open Sans", size=12, weight="bold")
+
+# Configure colors
+bg_color = "#000000"  # Black
+fg_color = "#FFFFFF"  # White
+highlight_color = "#FDDA0D"  # Yellow
+
+# Configure window background color
+window.configure(bg=bg_color)
+
+# Create distance label and entry field
+distance_label = tk.Label(window, text="Distance (in km):", bg=bg_color, fg=fg_color, font=font)
+distance_label.pack()
+distance_entry = tk.Entry(window, bg=highlight_color)
+distance_entry.pack()
+
+# Create the slot selection frame
+slot_frame = tk.Frame(window, bg=bg_color)
+slot_frame.pack(pady=10)
+
+# Create the slot label
+slot_label = tk.Label(slot_frame, text="Time Slot:", bg=bg_color, fg=fg_color, font=font)
+slot_label.pack(side="left")
+
+# Create the variable to store the selected slot
+var_slot = tk.IntVar()
+
+# Create the radio buttons for time slots
+time_slots = {
+    1: "Night Charge (12 AM - 6 AM)",
+    2: "Morning (6 AM - 9 AM)",
+    3: "Morning Rush (9 AM - 1 PM)",
+    4: "Afternoon (1 PM - 5 PM)",
+    5: "Evening Rush (5 PM - 9 PM)",
+    6: "Night (9 PM - 12 AM)"
+}
+
+for slot, description in time_slots.items():
+    radio_button = tk.Radiobutton(slot_frame, text=description, variable=var_slot, value=slot, bg=bg_color, fg=fg_color, font=font)
+    radio_button.pack(anchor="w")
+
+# Create the calculate button
+calculate_button = tk.Button(window, text="Calculate Fare", command=calculate_fare, bg=highlight_color)
+calculate_button.pack()
+
+# Start the Tkinter event loop
+window.mainloop()
